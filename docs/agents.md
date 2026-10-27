@@ -8,6 +8,10 @@ Specialist personas that play a single role with a single perspective. Each pers
 | [security-auditor](../agents/security-auditor.md) | Security Engineer | Vulnerability detection, OWASP-style audit |
 | [test-engineer](../agents/test-engineer.md) | QA Engineer | Test strategy, coverage analysis, Prove-It pattern |
 | [web-performance-auditor](../agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit, loading/rendering/network analysis |
+| [change-reviewer](../agents/change-reviewer.md) | Review Gate | Merge verdict on one change, with files read and a not-verified list |
+| [change-security-reviewer](../agents/change-security-reviewer.md) | Security Gate | Exhaustive checklist that blocks the merge on any open problem |
+| [change-fixer](../agents/change-fixer.md) | Repair | Smallest patch for one gate failure, capped at three rounds |
+| [release-manager](../agents/release-manager.md) | Release | Merge-queue retest, staged rollout, tested rollback command |
 
 ## How personas relate to skills and commands
 
@@ -52,8 +56,34 @@ Is the work a single perspective on a single artifact?
 ├── Yes → Direct persona invocation
 └── No  → Are the sub-tasks independent (no shared mutable state, no ordering)?
          ├── Yes → Slash command with parallel fan-out (e.g. /ship)
-         └── No  → Sequential slash commands run by the user (/spec → /plan → /build → /test → /review)
+         └── No  → Sequential orchestration: `/pipeline` for one change's gates, or sequential slash commands run by the user (/spec → /plan → /build → /test → /review)
 ```
+
+## Sequential orchestration: `/pipeline`
+
+Fan-out is not the only legitimate shape. A change that must pass review, then
+security, then a risk gate, then CI, then a merge queue, then a staged rollout
+has ordering and shared mutable state — one SHA, one round counter, one change
+record. Running those gates in parallel would mean merging on evidence none of
+them produced.
+
+`/pipeline` is therefore a **sequential orchestrator**:
+
+- The **command** is the orchestrator. It dispatches one persona at a time and
+  waits for a verdict.
+- **Personas still never invoke each other.** `change-reviewer` cannot call
+  `change-security-reviewer`; if it thinks a security pass is needed, it says so
+  in its report.
+- **Order and budget live on disk**, in `.pipeline/<change-id>/state.json`, not
+  in the orchestrator's memory. A fresh session can resume without the
+  transcript.
+- **The state machine refuses shortcuts**: a gate cannot be recorded before its
+  predecessors pass, a verdict is only valid for the SHA it judged, and a fourth
+  failed verification stops the pipeline.
+
+The distinction from fan-out is dependency, not ceremony: `/ship` reviews one
+artifact from three independent angles; `/pipeline` moves one artifact through
+states where each step depends on the last.
 
 ## Worked example: valid orchestration
 
