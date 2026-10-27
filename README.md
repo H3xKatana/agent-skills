@@ -21,7 +21,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ## Commands
 
-8 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+9 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
 
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
@@ -33,6 +33,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 | Audit web performance | `/webperf` | Measure before you optimize |
 | Simplify the code | `/code-simplify` | Clarity over cleverness |
 | Ship to production | `/ship` | Faster is safer |
+| Ship through ordered gates | `/pipeline` | Evidence at every gate |
 
 Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
 
@@ -45,7 +46,7 @@ Skills also activate automatically based on what you're doing — designing an A
 **Fastest path — any agent, one command.** The open [skills CLI](https://github.com/vercel-labs/skills) installs into 70+ agents (Claude Code, Cursor, Codex, Copilot, Cline, and more):
 
 ```bash
-npx skills add addyosmani/agent-skills            # install all 24 skills
+npx skills add addyosmani/agent-skills            # install all 25 skills
 npx skills add addyosmani/agent-skills --list     # browse before installing
 ```
 
@@ -169,9 +170,9 @@ Skills are plain Markdown - they work with any agent that accepts system prompts
 
 ---
 
-## All 24 Skills
+## All 25 Skills
 
-The commands above are entry points. The pack includes 24 skills total — 23 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The commands above are entry points. The pack includes 25 skills total — 24 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 ### Meta - Discover which skill applies
 
@@ -231,6 +232,7 @@ The commands above are entry points. The pack includes 24 skills total — 23 li
 | [documentation-and-adrs](skills/documentation-and-adrs/SKILL.md) | Architecture Decision Records, API docs, inline documentation standards - document the *why* | Making architectural decisions, changing APIs, or shipping features |
 | [observability-and-instrumentation](skills/observability-and-instrumentation/SKILL.md) | Structured logging, RED metrics, OpenTelemetry tracing, symptom-based alerting - instrument as you build | Adding telemetry, or shipping anything that runs in production |
 | [shipping-and-launch](skills/shipping-and-launch/SKILL.md) | Pre-launch checklists, feature flag lifecycle, staged rollouts, rollback procedures, monitoring setup | Preparing to deploy to production |
+| [delivery-pipeline](skills/delivery-pipeline/SKILL.md) | Ordered evidence gates from authored code to full rollout: independent review, security, risk, human approval when risky, CI, merge queue, staged rollout, and a fixer loop capped at three rounds | Shipping a change end to end, or repairing a change that failed CI or a rollout |
 
 ---
 
@@ -244,6 +246,10 @@ Pre-configured specialist personas for targeted reviews:
 | [test-engineer](agents/test-engineer.md) | QA Specialist | Test strategy, coverage analysis, and the Prove-It pattern |
 | [security-auditor](agents/security-auditor.md) | Security Engineer | Vulnerability detection, threat modeling, OWASP assessment |
 | [web-performance-auditor](agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule; run it via `/webperf` |
+| [change-reviewer](agents/change-reviewer.md) | Review Gate | Merge verdict on one change, with files read and a not-verified list |
+| [change-security-reviewer](agents/change-security-reviewer.md) | Security Gate | Exhaustive checklist pass that blocks the merge on any open problem |
+| [change-fixer](agents/change-fixer.md) | Repair | One root cause, smallest patch, capped at three rounds; never pushes or grades itself |
+| [release-manager](agents/release-manager.md) | Release | Merge-queue retest, staged rollout, tested rollback command |
 
 See [docs/agents.md](docs/agents.md) for the decision matrix, orchestration rules, and how personas compose with skills and slash commands.
 
@@ -300,7 +306,7 @@ Every skill follows a consistent anatomy:
 
 ```
 agent-skills/
-├── skills/                            # 24 skills (23 lifecycle + 1 meta)
+├── skills/                            # 25 skills (24 lifecycle + 1 meta)
 │   ├── interview-me/                  #   Define
 │   ├── idea-refine/                   #   Define
 │   ├── spec-driven-development/       #   Define
@@ -324,13 +330,14 @@ agent-skills/
 │   ├── documentation-and-adrs/        #   Ship
 │   ├── observability-and-instrumentation/ # Ship
 │   ├── shipping-and-launch/           #   Ship
+│   ├── delivery-pipeline/             #   Ship: gated delivery machine
 │   └── using-agent-skills/            #   Meta: how to use this pack
-├── agents/                            # 4 specialist personas
+├── agents/                            # 8 specialist personas
 ├── references/                        # 5 supplementary checklists
 ├── hooks/                             # Session lifecycle hooks
-├── .claude/commands/                  # 8 slash commands (Claude Code)
-├── .gemini/commands/                  # 8 slash commands (Gemini CLI)
-├── commands/                          # 8 slash commands (Antigravity CLI)
+├── .claude/commands/                  # 9 slash commands (Claude Code)
+├── .gemini/commands/                  # 9 slash commands (Gemini CLI)
+├── commands/                          # 9 slash commands (Antigravity CLI)
 ├── plugin.json                        # Antigravity plugin manifest
 └── docs/                              # Setup guides per tool
 ```
