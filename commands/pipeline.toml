@@ -1,0 +1,120 @@
+description = "Run one change through the ordered delivery gates — review, security, risk, human approval when risky, CI, merge queue, and staged rollout — with a fixer loop capped at three rounds"
+
+prompt = """
+Invoke the delivery-pipeline skill.
+
+`/pipeline` is a **sequential gate machine**, not a fan-out. Each gate depends on the previous gate's verdict, the current SHA, and the round budget, so the phases cannot run in parallel. You are the orchestrator: you dispatch one persona at a time, record its verdict, and decide whether the change advances, goes to the fixer, or stops.
+
+The CLI exposes each custom subagent in `agents/` as a tool with the same name — so `change-reviewer.md` becomes a `change-reviewer` tool, and `@change-reviewer` works as an explicit invocation.
+
+**State lives in `.pipeline/<change-id>/state.json`, never in your memory.** Read it at the start of every phase. Use the skill's script for every transition:
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh <command>
+```
+
+## Phase 0 — Open the record
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh init
+```
+
+One paragraph from the author: what changed and why. No self-assessment. Keep `.pipeline/` out of git.
+
+## Phase 1 — Review gate
+
+Dispatch **`change-reviewer`** with the bundle: base SHA, diff, file list, author summary, repo path, test/lint commands, constraints. Do not include the author's plan or your own opinion.
+
+Wait for the verdict. Then:
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate review pass   # or fail
+```
+
+A review with no file list is a `FAIL`, whatever its verdict says.
+
+## Phase 2 — Security gate
+
+Dispatch **`change-security-reviewer`** in a fresh context, with the same bundle. It must attempt every checklist item and record `N/A` reasons.
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate security pass   # or fail
+```
+
+## Phase 3 — Risk gate
+
+Score with the rubric in the skill. Record the computed inputs (`--shortstat`, file count, sensitive paths) — not an opinion.
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate risk low      # or medium / high
+```
+
+`high` opens the human gate. Any unknown input scores `high`. Never downgrade a tier yourself; only a person can, in writing.
+
+## Phase 4 — Human gate (high risk only)
+
+Show the person: diff stat, review verdict, security verdict, the exact rubric rules that fired, the rollback plan, and the not-verified list. Ask one question: approve or reject.
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh human approve "<name>"
+```
+
+Do not push while waiting. A rejection goes to the fixer and costs a round.
+
+## Phase 5 — Push and CI
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh check && git push origin HEAD
+```
+
+Wait for CI on the pushed SHA, not an earlier one. Then:
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate ci pass   # or fail
+```
+
+## Phase 6 — Merge queue
+
+Confirm the queue retested against the current base. A green run on the old base does not count.
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate queue pass   # or fail
+```
+
+## Phase 7 — Rollout
+
+Dispatch **`release-manager`** with the merge SHA and the rollout plan. It merges through the queue, runs testers → wider → everyone, records baselines and windows, and rolls back on a declared trigger.
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh gate rollout pass
+```
+
+## Repair phase — capped at three rounds
+
+On any `fail`, the script moves the phase to `fix` and increments the round. Dispatch **`change-fixer`** with the failure evidence only — not the reviewer's prose, not the previous fixer's notes. Give it the round number and the remaining budget.
+
+After the fixer commits:
+
+```bash
+bash skills/delivery-pipeline/scripts/pipeline.sh sync
+```
+
+`sync` stales every gate, because verdicts belong to the SHA they judged. Re-run from review. Re-runs cost no round; only a failed verification does.
+
+When the script exits 2, the pipeline is stopped. Write `handback.md` — what failed each round, what was tried, the evidence, and two or three approaches still open — and return the change to the author. Do not open a PR, merge, or roll out.
+
+## Hard rules
+
+1. **Order is fixed.** Review → security → risk → human → CI → queue → rollout. The script refuses out-of-order gates; do not work around it.
+2. **One persona at a time, fresh context each.** Never pass a session ID to keep the thread warm. A gate that sees the author's conclusion agrees with it.
+3. **Never record a verdict by hand.** Use `pipeline.sh gate`. Editing `state.json` directly destroys the evidence trail.
+4. **Security problems block the merge.** No severity waivers, no "pre-existing", no "small diff".
+5. **No push before the human approves** when risk is `high`.
+6. **No merge on a stale base.** Retest, then merge.
+7. **No rollout without a tested rollback command.**
+8. **Three fix rounds, then stop.** Do not start a fourth attempt.
+
+## Final report
+
+Report: rounds used, gates that failed, what remains unverified, the merge SHA, retest base, rollout stage reached, and the rollback plan. "Shipped" means the last stage completed and its window closed. Anything else is reported by its real stage: `in canary`, `rolled back`, `ejected from queue`, `stopped at round 3`.
+"""
